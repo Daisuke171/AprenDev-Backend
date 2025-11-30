@@ -1,9 +1,17 @@
 import { Module } from '@nestjs/common';
-import { AuthController } from './auth.controller';
+import { JwtModule } from '@nestjs/jwt';
+import { AuthGateway } from './auth.gateway';
 import { AuthService } from './auth.service';
+import { RedisService } from '../redis/redis.service';
+import { HashService } from '../security/hash.service';
 
 @Module({
-  controllers: [AuthController],
-  providers: [AuthService]
+  imports: [
+    JwtModule.register({
+      secret: 'SUPER_SECRET_KEY', // chore: crear un env
+      signOptions: { expiresIn: '1h' },
+    }),
+  ],
+  providers: [AuthGateway, AuthService, RedisService, HashService],
 })
 export class AuthModule {}

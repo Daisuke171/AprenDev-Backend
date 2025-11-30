@@ -22,7 +22,9 @@
   "dependencies": {
     "@nestjs/common": "^11.1.9",
     "@nestjs/core": "^11.1.9",
+    "@nestjs/jwt": "^11.0.1",
     "@nestjs/platform-express": "^11.1.9",
+    "@nestjs/platform-socket.io": "^11.1.9",
     "@nestjs/websockets": "^11.1.9",
     "bcrypt": "^6.0.0",
     "dotenv": "^17.2.3",
@@ -30,12 +32,14 @@
     "redis": "^5.9.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
+    "socket.io": "^4.8.1",
     "ws": "^8.18.3"
   },
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",
     "@types/express": "^5.0.5",
     "@types/node": "^24.10.1",
+    "@types/socket.io": "^3.0.2",
     "@types/ws": "^8.18.1",
     "nodemon": "^3.1.11"
   }

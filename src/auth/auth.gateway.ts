@@ -3,110 +3,66 @@ import {
   SubscribeMessage,
   MessageBody,
   ConnectedSocket,
+  WebSocketServer,
 } from '@nestjs/websockets';
-import { WebSocket } from 'ws';
+import { Server, Socket } from 'socket.io';
 import { RedisService } from '../redis/redis.service';
 import { HashService } from '../security/hash.service';
+import { AuthService } from './auth.service';
 
-@WebSocketGateway(8000, { cors:{ origin: 'http://localhost:4325' } })
+@WebSocketGateway({
+  cors: { origin: 'http://localhost:4325' },
+})
 export class AuthGateway {
+  @WebSocketServer()
+  server: Server;
+
   constructor(
     private readonly redisService: RedisService,
     private readonly hashService: HashService,
+    private readonly authService: AuthService,
   ) {}
 
-  // Handler para "register"
   @SubscribeMessage('register')
-  async handleRegister(
-    @MessageBody() payload: { username: string; password: string },
-    @ConnectedSocket() client: WebSocket,){
-   
-    const { username, password } = payload;
-    const redis = this.redisService.getClient();
-
-    const hashedPassword = await this.hashService.hashPassword(password);
-    await redis.hSet(`user:${username}`, { username, password: hashedPassword });
-
-    if (!username || !password) {
-      return client.send(
-        JSON.stringify({
-          type: 'error',
-          payload: { message: 'Datos incompletos' },
-        }),
-      );
-    }
-
-    client.send(
-      JSON.stringify({
-        type: 'register',
-        payload: {username},
-      }),
-    );
-     return { status: 'ok', message: `Usuario ${username} registrado` };
+  handleRegister(client: Socket, payload: any) {
+    console.log('REGISTER recibido:', payload);
+    // ejemplo de respuesta al cliente
+    this.server.to(client.id).emit('register_response', { status: 'ok', payload });
   }
 
-  // Handler para "login"
-  @SubscribeMessage('login')
-  async handleLogin(
-    @MessageBody() payload: { username: string; password: string },
-    @ConnectedSocket() client: WebSocket,
-  ) {
-    const { username, password } = payload;
 
+  @SubscribeMessage('login')
+  async login(
+    @MessageBody() { username, password }: { username: string; password: string },
+    @ConnectedSocket() client: Socket,
+  ) {
     const redis = this.redisService.getClient();
     const user = await redis.hGetAll(`user:${username}`);
 
-    if (user && user.password === password) {
-      client.send(
-        JSON.stringify({
-          type: 'ok',
-          payload: { message: 'Login exitoso' },
-        }),
-      );
-    } else {
-      client.send(
-        JSON.stringify({
-          type: 'error',
-          payload: { message: 'Credenciales inválidas' },
-        }),
-      );
-    }
+    if (!user?.password) return client.emit('error', { message: 'Usuario no encontrado' });
+
+    const valid = await this.hashService.comparePassword(password, user.password);
+    if (!valid) return client.emit('error', { message: 'Credenciales inválidas' });
+
+    const token = this.authService.generateToken(username);
+    await redis.set(`session:${username}`, token);
+
+    client.emit('login', { ok: true, username, token });
   }
 
-  // Handler para "logout"
   @SubscribeMessage('logout')
-  async handleLogout(
-    @MessageBody() payload: { username: string },
-    @ConnectedSocket() client: WebSocket,
+  async logout(
+    @MessageBody() { token }: { token: string },
+    @ConnectedSocket() client: Socket,
   ) {
-    const { username } = payload;
-
-    if (!username) {
-      return client.send(
-        JSON.stringify({
-          type: 'error',
-          payload: { message: 'Falta el username' },
-        }),
-      );
-    }
-
     try {
+      const decoded = this.authService.verifyToken(token);
       const redis = this.redisService.getClient();
-      await redis.del(`session:${username}`);
+      await redis.del(`session:${decoded.username}`);
 
-      client.send(
-        JSON.stringify({
-          type: 'ok',
-          payload: { message: 'Logout exitoso', username },
-        }),
-      );
-    } catch (err) {
-      client.send(
-        JSON.stringify({
-          type: 'error',
-          payload: { message: 'Error en logout', details: err.message },
-        }),
-      );
+      client.emit('logout', { ok: true, username: decoded.username });
+    } catch {
+      client.emit('error', { message: 'Token inválido o expirado' });
     }
   }
 }

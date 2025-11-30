@@ -7,8 +7,8 @@ import { RedisService } from './redis/redis.service';
 
 @Module({
   imports: [
-    AuthModule,      // 👈 tu módulo de autenticación (con AuthGateway)
-    SecurityModule,  // 👈 tu módulo de seguridad (con HashService)
+    AuthModule,
+    SecurityModule,
   ],
   controllers: [AppController],
   providers: [AppService, RedisService],
