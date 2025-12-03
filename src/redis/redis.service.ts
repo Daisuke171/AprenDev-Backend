@@ -1,5 +1,8 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { createClient } from 'redis';
+import * as dotenv from 'dotenv';
+
+dotenv.config();
 
 type RedisClient = ReturnType<typeof createClient>;
 
