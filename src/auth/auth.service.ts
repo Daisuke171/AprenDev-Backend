@@ -67,9 +67,26 @@ export class AuthService {
     }
 
     const token = this.jwtService.sign({ username });
-    await redis.set(`session:${username}`, token);
+    await redis.set(`session:${token}`, JSON.stringify({ username }), { EX: 3600 }); // expira en 1h
 
     return { ok: true, username, token };
   }
+
+
+  // Obtener el usuario actual con el token
+  async getSession(token: string) {
+  const redis = this.redisService.getClient();
+  const data = await redis.get(`session:${token}`);
+  console.log('Sesión desde Redis:', data);
+
+  if (!data) return null;
+  return JSON.parse(data); // { username }
+}
+
+
+async deleteSession(token: string) {
+  const redis = this.redisService.getClient();
+  await redis.del(`session:${token}`);
+}
 }
 
