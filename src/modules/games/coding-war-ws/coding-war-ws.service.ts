@@ -6,6 +6,8 @@ interface Room {
   name: string;
   ownerId: string;
   members: Set<string>;
+  ready: Map<string, boolean>;
+  gameStarted: boolean;
 }
 
 @Injectable()
@@ -43,15 +45,23 @@ export class CodingWarWsService {
       name: roomName,
       ownerId,
       members: new Set([ownerId]),
+      ready: new Map([[ownerId, false]]),
+      gameStarted: false,
     });
 
     return roomId;
   }
 
   getRoom(roomId: string): Omit<Room, 'members'> & { members: string[] } | undefined {
+    console.log('🔍 [Service] Looking for room:', roomId);
+    console.log('📋 [Service] Available rooms:', Array.from(this.rooms.keys()));
     const room = this.rooms.get(roomId);
-    if (!room) return undefined;
+    if (!room) {
+      console.log('❌ [Service] Room not found:', roomId);
+      return undefined;
+    }
 
+    console.log('✅ [Service] Room found:', roomId);
     return {
       ...room,
       members: [...room.members],
@@ -75,7 +85,44 @@ export class CodingWarWsService {
     if (room.members.has(clientId)) return false;
 
     room.members.add(clientId);
+    room.ready.set(clientId, false);
     return true;
+  }
+
+  setReady(roomId: string, clientId: string, ready: boolean): boolean {
+    const room = this.rooms.get(roomId);
+    if (!room || !room.members.has(clientId)) return false;
+    room.ready.set(clientId, ready);
+    return true;
+  }
+
+  isAllReady(roomId: string): boolean {
+    const room = this.rooms.get(roomId);
+    if (!room) return false;
+    if (room.members.size < 2) return false;
+    return Array.from(room.ready.values()).every((ready) => ready);
+  }
+
+  getReadyStatus(roomId: string): Record<string, boolean> {
+    const room = this.rooms.get(roomId);
+    if (!room) return {};
+    const status: Record<string, boolean> = {};
+    room.ready.forEach((ready, clientId) => {
+      status[clientId] = ready;
+    });
+    return status;
+  }
+
+  setGameStarted(roomId: string, started: boolean): boolean {
+    const room = this.rooms.get(roomId);
+    if (!room) return false;
+    room.gameStarted = started;
+    return true;
+  }
+
+  isGameStarted(roomId: string): boolean {
+    const room = this.rooms.get(roomId);
+    return room ? room.gameStarted : false;
   }
 
   leaveRoom(roomId: string, clientId: string): boolean {
